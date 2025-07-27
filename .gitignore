@@ -1,0 +1,14 @@
+# Ignorar carpetas de Node.js (frontend)
+autentica-app/node_modules/
+autentica-app/build/ # Carpeta de build de React
+
+# Ignorar carpetas de Python (backend)
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/store.db # ¡IMPORTANTE! No subas la base de datos local directamente
+backend/.flaskenv # Si usas variables de entorno locales
+
+# Ignorar archivos de configuración sensibles (si los creas)
+.env
+*.env
