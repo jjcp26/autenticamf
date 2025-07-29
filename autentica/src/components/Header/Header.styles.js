@@ -2,7 +2,7 @@
 
 import styled, { css } from 'styled-components';
 import { COLORS } from '../../constants/colors'; // Importa tus colores
-import { FONTS } from '../../constants/fonts'; // Importa tus fuentes
+//import { FONTS } from '../../constants/fonts'; // Importa tus fuentes
 
 // Definir espaciados y breakpoints aquí o como constantes si se usan mucho
 const SPACING = {
