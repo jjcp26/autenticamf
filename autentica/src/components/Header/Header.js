@@ -6,6 +6,7 @@ import { NavWrapper, Logo, NavLinks, NavItem, NavLink, MenuToggle, CartIcon, Car
 import { FaBars, FaShoppingCart } from 'react-icons/fa';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext'; // Importa useAuth
+import logo from '../../assets/images/logo.png';
 
 const Header = () => {
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -23,15 +24,17 @@ const Header = () => {
 
   return (
     <NavWrapper>
-      <Logo>Autentica</Logo>
+      <Logo>
+          <img src={logo} alt="Logo de Autentica" />
+      </Logo>
       <MenuToggle onClick={toggleMenu} aria-label="Menu">
         <FaBars />
       </MenuToggle>
       <NavLinks $active={menuOpen}>
         <NavItem><NavLink as={RouterNavLink} to="/">Inicio</NavLink></NavItem>
         <NavItem><NavLink as={RouterNavLink} to="/coleccion">Colección</NavLink></NavItem>
-        <NavItem><NavLink href="#novedades">Novedades</NavLink></NavItem>
-        <NavItem><NavLink href="#acerca">Acerca de</NavLink></NavItem>
+        <NavItem><NavLink as={RouterNavLink} to="/novedades">Novedades</NavLink></NavItem>
+        <NavItem><NavLink as={RouterNavLink} to="/acerca">Acerca de</NavLink></NavItem>
         <NavItem><NavLink as={RouterNavLink} to="/contacto">Contacto</NavLink></NavItem>
         {user ? (
           <>
