@@ -7,6 +7,8 @@ import Footer from './components/Footer/Footer';
 import Home from './pages/Home/Home';
 import Collection from './pages/Collection/Collection';
 import Contact from './pages/Contact/Contact';
+import NovedadesSection from './pages/Home/NovedadesSection';
+import AboutSection from './pages/Home/AboutSection';
 import CartModal from './components/CartModal/CartModal';
 import LoginPage from './pages/Admin/LoginPage';
 import AdminDashboard from './pages/Admin/AdminDashboard';
@@ -29,6 +31,8 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/coleccion" element={<Collection />} />
               <Route path="/contacto" element={<Contact />} />
+              <Route path="/novedades" element={<NovedadesSection />}/>
+              <Route path="/acerca" element={<AboutSection />}/>
               <Route path="/admin/login" element={<LoginPage />} />
 
               {/* Rutas protegidas para el administrador */}
