@@ -1,266 +1,238 @@
-// src/pages/Admin/HeroImageManagement.js (ACTUALIZADO)
-
+// src/pages/admin/HeroImageManagement.js
 import React, { useState, useEffect } from 'react';
-import {
-  ManagementContainer,
-  ManagementHeader,
-  ManagementTitle,
-  AddButton,
-  Table,
-  TableHeader,
-  TableRow,
-  TableCell,
-  ActionButton,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalTitle,
-  CloseButton,
-  FormGroup,
-  FormLabel,
-  FormInput,
-  FormCheckboxContainer,
-  FormCheckboxLabel,
-  FormCheckboxInput,
-  FormButton,
-  Message
-} from './ProductManagement.styles';
-import { FaPlus, FaToggleOn, FaToggleOff, FaTrash, FaTimes } from 'react-icons/fa';
+import styled from 'styled-components';
+import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { FiUpload, FiTrash2 } from 'react-icons/fi';
+import Button from '../../components/Button/Button';
+import { toast } from 'react-toastify';
 
 const HeroImageManagement = () => {
-  const [images, setImages] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    image_url: '',
-    title: '',
-    subtitle: '',
-    active: true
-  });
-  const [message, setMessage] = useState(null);
+  const { getToken } = useAuth(); // Usamos la función getToken del contexto
+  const [heroImages, setHeroImages] = useState([]);
+  const [newImage, setNewImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+
+  const fetchHeroImages = async () => {
+    try {
+      const token = getToken(); // Obtenemos el token
+      if (!token) {
+        toast.error('No hay token de autenticación. Inicie sesión de nuevo.');
+        return;
+      }
+      
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/hero_images`, {
+        headers: {
+          'Authorization': `Bearer ${token}` // Añadimos el encabezado de autorización
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Error de HTTP! estado: ' + response.status);
+      }
+      
+      const data = await response.json();
+      setHeroImages(data);
+    } catch (error) {
+      console.error("Error al obtener imágenes del héroe:", error);
+      toast.error('Error al obtener imágenes: ' + error.message);
+    }
+  };
 
   useEffect(() => {
     fetchHeroImages();
   }, []);
 
-  const fetchHeroImages = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/hero_images`, {
-        credentials: 'include' // <--- AÑADE ESTA LÍNEA
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      setImages(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    setNewImage(file);
+    if (file) {
+      setImagePreview(URL.createObjectURL(file));
+    } else {
+      setImagePreview(null);
     }
   };
 
-  const openAddModal = () => {
-    setFormData({
-      image_url: '',
-      title: '',
-      subtitle: '',
-      active: true
-    });
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setFormData({
-      image_url: '',
-      title: '',
-      subtitle: '',
-      active: true
-    });
-    setMessage(null);
-  };
-
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  const handleSubmit = async (e) => {
+  const handleUpload = async (e) => {
     e.preventDefault();
-    setMessage(null);
+    if (!newImage) {
+      toast.error("Por favor, seleccione un archivo para subir.");
+      return;
+    }
+
+    const token = getToken(); // Obtenemos el token para el upload
+    if (!token) {
+      toast.error('No hay token de autenticación. Inicie sesión de nuevo.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("hero_image", newImage);
 
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/hero_images`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${token}` // Añadimos el encabezado de autorización
         },
-        body: JSON.stringify(formData),
-        credentials: 'include' // <--- AÑADE ESTA LÍNEA
+        body: formData,
       });
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setMessage({ type: 'success', text: data.message });
-        fetchHeroImages();
-        closeModal();
-      } else {
-        setMessage({ type: 'error', text: data.message || 'Error al añadir la imagen del carrusel.' });
+      if (!response.ok) {
+        throw new Error('Error de HTTP! estado: ' + response.status);
       }
-    } catch (err) {
-      setMessage({ type: 'error', text: `Error de conexión: ${err.message}` });
+      
+      await response.json();
+      toast.success("Imagen subida con éxito!");
+      setNewImage(null);
+      setImagePreview(null);
+      fetchHeroImages(); // Actualizar la lista
+    } catch (error) {
+      console.error("Error al subir la imagen:", error);
+      toast.error('Error al subir la imagen: ' + error.message);
     }
   };
 
-const handleToggleActive = async (imageId, currentStatus) => {
-    setMessage(null);
+  const handleDelete = async (id) => {
+    if (!window.confirm("¿Está seguro de que desea eliminar esta imagen?")) {
+      return;
+    }
+
+    const token = getToken(); // Obtenemos el token para el delete
+    if (!token) {
+      toast.error('No hay token de autenticación. Inicie sesión de nuevo.');
+      return;
+    }
+
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/hero_images/${imageId}/toggle`, {
-        method: 'PUT',
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/hero_images/${id}`, {
+        method: 'DELETE',
         headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ active: !currentStatus }),
-        credentials: 'include'
-      });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setMessage({ type: 'success', text: data.message });
-        // --- CAMBIO CLAVE AQUÍ ---
-        // En lugar de recargar todo, actualizamos el estado localmente
-        setImages(prevImages =>
-          prevImages.map(img =>
-            img.id === imageId ? { ...img, active: data.new_status } : img
-          )
-        );
-      } else {
-        setMessage({ type: 'error', text: data.message || 'Error al cambiar el estado.' });
-      }
-    } catch (err) {
-      setMessage({ type: 'error', text: `Error de conexión: ${err.message}` });
-    }
-  };
-
-  const handleDelete = async (imageId) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar esta imagen del carrusel?')) {
-      setMessage(null);
-      try {
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/hero_images/${imageId}`, {
-          method: 'DELETE',
-          credentials: 'include' // <--- AÑADE ESTA LÍNEA
-        });
-        const data = await response.json();
-        if (response.ok && data.success) {
-          setMessage({ type: 'success', text: data.message });
-          fetchHeroImages();
-        } else {
-          setMessage({ type: 'error', text: data.message || 'Error al eliminar la imagen.' });
+          'Authorization': `Bearer ${token}` // Añadimos el encabezado de autorización
         }
-      } catch (err) {
-        setMessage({ type: 'error', text: `Error de conexión: ${err.message}` });
+      });
+
+      if (!response.ok) {
+        throw new Error('Error de HTTP! estado: ' + response.status);
       }
+      
+      await response.json();
+      toast.success("Imagen eliminada con éxito!");
+      fetchHeroImages(); // Actualizar la lista
+    } catch (error) {
+      console.error("Error al eliminar la imagen:", error);
+      toast.error('Error al eliminar la imagen: ' + error.message);
     }
   };
-
-  if (loading) return <ManagementContainer><Message type="info">Cargando imágenes del carrusel...</Message></ManagementContainer>;
-  if (error) return <ManagementContainer><Message type="error">Error: {error}</Message></ManagementContainer>;
 
   return (
     <ManagementContainer>
-      <ManagementHeader>
-        <ManagementTitle>Gestión de Imágenes del Carrusel</ManagementTitle>
-        <AddButton onClick={openAddModal}><FaPlus /> Añadir Imagen</AddButton>
-      </ManagementHeader>
-
-      {message && <Message type={message.type}>{message.text}</Message>}
-
-      <Table>
-        <thead>
-          <TableRow>
-            <TableHeader>ID</TableHeader>
-            <TableHeader>Imagen</TableHeader>
-            <TableHeader>Título</TableHeader>
-            <TableHeader>Subtítulo</TableHeader>
-            <TableHeader>Activa</TableHeader>
-            <TableHeader>Acciones</TableHeader>
-          </TableRow>
-        </thead>
-        <tbody>
-          {images.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan="6">No hay imágenes del carrusel para mostrar.</TableCell>
-            </TableRow>
-          ) : (
-            images.map(image => (
-              <TableRow key={image.id}>
-                <TableCell>{image.id}</TableCell>
-                <TableCell>
-                  <img src={`${process.env.REACT_APP_API_URL}${image.image_url}`} alt={image.title} style={{ width: '100px', height: '60px', objectFit: 'cover', borderRadius: '4px' }} />
-                </TableCell>
-                <TableCell>{image.title}</TableCell>
-                <TableCell>{image.subtitle}</TableCell>
-                <TableCell>
-                  {image.active ? <FaToggleOn style={{ color: 'green', fontSize: '1.5rem' }} /> : <FaToggleOff style={{ color: 'red', fontSize: '1.5rem' }} />}
-                </TableCell>
-                <TableCell>
-                  <ActionButton onClick={() => handleToggleActive(image.id, image.active)}>
-                    {image.active ? 'Desactivar' : 'Activar'}
-                  </ActionButton>
-                  <ActionButton onClick={() => handleDelete(image.id)}><FaTrash /></ActionButton>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </tbody>
-      </Table>
-
-      {isModalOpen && (
-        <ModalOverlay onClick={closeModal}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>Añadir Nueva Imagen del Carrusel</ModalTitle>
-              <CloseButton onClick={closeModal}><FaTimes /></CloseButton>
-            </ModalHeader>
-            <form onSubmit={handleSubmit}>
-              <FormGroup>
-                <FormLabel htmlFor="image_url">URL de Imagen:</FormLabel>
-                <FormInput type="text" id="image_url" name="image_url" value={formData.image_url} onChange={handleChange} required />
-              </FormGroup>
-              <FormGroup>
-                <FormLabel htmlFor="title">Título:</FormLabel>
-                <FormInput type="text" id="title" name="title" value={formData.title} onChange={handleChange} />
-              </FormGroup>
-              <FormGroup>
-                <FormLabel htmlFor="subtitle">Subtítulo:</FormLabel>
-                <FormInput type="text" id="subtitle" name="subtitle" value={formData.subtitle} onChange={handleChange} />
-              </FormGroup>
-              <FormGroup>
-                <FormCheckboxContainer>
-                  <FormCheckboxInput
-                    type="checkbox"
-                    id="active"
-                    name="active"
-                    checked={formData.active}
-                    onChange={handleChange}
-                  />
-                  <FormCheckboxLabel htmlFor="active">Activa</FormCheckboxLabel>
-                </FormCheckboxContainer>
-              </FormGroup>
-              <FormButton type="submit">Añadir Imagen</FormButton>
-            </form>
-          </ModalContent>
-        </ModalOverlay>
-      )}
+      <AdminHeader>
+        <StyledNavLink to="/admin">{'< Volver al Panel'}</StyledNavLink>
+        <h2>Gestión de Imágenes del Carrusel</h2>
+      </AdminHeader>
+      <UploadSection>
+        <h3>Subir Nueva Imagen</h3>
+        <input type="file" onChange={handleFileChange} accept="image/*" />
+        {imagePreview && (
+          <ImagePreviewContainer>
+            <img src={imagePreview} alt="Vista previa de la imagen" />
+          </ImagePreviewContainer>
+        )}
+        <Button
+          onClick={handleUpload}
+          disabled={!newImage}
+          icon={<FiUpload />}
+          text="Subir Imagen"
+        />
+      </UploadSection>
+      <ImagesList>
+        <h3>Imágenes Actuales</h3>
+        {heroImages.length > 0 ? (
+          heroImages.map((image) => (
+            <ImageItem key={image.id}>
+              <img src={`${process.env.REACT_APP_API_URL}${image.url}`} alt={image.filename} />
+              <Button
+                onClick={() => handleDelete(image.id)}
+                icon={<FiTrash2 />}
+                text="Eliminar"
+              />
+            </ImageItem>
+          ))
+        ) : (
+          <p>No hay imágenes del héroe disponibles.</p>
+        )}
+      </ImagesList>
     </ManagementContainer>
   );
 };
+
+// Estilos
+const ManagementContainer = styled.div`
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+`;
+
+const AdminHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+`;
+
+const StyledNavLink = styled(NavLink)`
+  color: #007bff;
+  text-decoration: none;
+  font-weight: 500;
+  &:hover {
+    text-decoration: underline;
+  }
+`;
+
+const UploadSection = styled.div`
+  background: #f8f9fa;
+  padding: 2rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  text-align: center;
+  input[type="file"] {
+    display: block;
+    margin: 1rem auto;
+  }
+`;
+
+const ImagePreviewContainer = styled.div`
+  margin-top: 1rem;
+  img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+  }
+`;
+
+const ImagesList = styled.div`
+  h3 {
+    margin-bottom: 1.5rem;
+  }
+`;
+
+const ImageItem = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  img {
+    max-width: 200px;
+    height: auto;
+    border-radius: 4px;
+    margin-right: 1rem;
+  }
+`;
 
 export default HeroImageManagement;
