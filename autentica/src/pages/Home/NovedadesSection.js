@@ -12,7 +12,7 @@ const NovedadesSection = () => {
   useEffect(() => {
     const fetchNovedades = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/novedades');
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/products`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -39,7 +39,7 @@ const NovedadesSection = () => {
           featuredProducts.map(product => (
             <ProductCard key={product.id} product={{
               ...product,
-              image: `http://localhost:5000${product.image_url}` // Usa image_url del backend
+              image: `${process.env.REACT_APP_API_URL}${product.image_url}` // Usa image_url del backend
             }} />
           ))
         ) : (
