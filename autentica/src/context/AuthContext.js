@@ -1,96 +1,93 @@
-// src/context/AuthContext.js (ACTUALIZADO)
+// src/context/AuthContext.js
 
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 
-const AuthContext = createContext();
+// Creamos el contexto de autenticación
+const AuthContext = createContext(null);
 
+// Hook personalizado para usar el contexto
+export const useAuth = () => useContext(AuthContext);
+
+// Proveedor del contexto de autenticación
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    try {
-      const storedUser = localStorage.getItem('autentica_admin_user');
-      return storedUser ? JSON.parse(storedUser) : null;
-    } catch (error) {
-      console.error("Error al cargar el usuario de localStorage:", error);
-      return null;
-    }
-  });
-  const navigate = useNavigate();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      if (user) {
-        localStorage.setItem('autentica_admin_user', JSON.stringify(user));
-      } else {
-        localStorage.removeItem('autentica_admin_user');
-      }
-    } catch (error) {
-      console.error("Error al guardar el usuario en localStorage:", error);
-    }
-  }, [user]);
+    // Al cargar la aplicación, verificamos si hay una sesión activa.
+    // Esto se puede hacer llamando a una ruta en el backend que
+    // devuelva el estado de la sesión, pero para mantenerlo simple,
+    // asumiremos que el estado de la sesión se gestiona con éxito
+    // en cada solicitud protegida.
+    setLoading(false);
+  }, []);
 
   const login = async (username, password) => {
+    setLoading(true);
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/admin/login`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/login`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: new URLSearchParams({
-          username: username,
-          password: password,
-        }),
-        credentials: 'include' // <--- AÑADE ESTA LÍNEA
+        // AÑADIMOS ESTO: Esto es CRUCIAL para que el navegador acepte
+        // y guarde la cookie de sesión que el backend de Flask envía.
+        credentials: 'include' 
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
+        setIsAuthenticated(true);
         setUser({ username: data.user.username });
-        return { success: true, message: data.message };
+        toast.success(data.message);
+        return true;
       } else {
-        return { success: false, message: data.message || "Error desconocido en el inicio de sesión." };
+        setIsAuthenticated(false);
+        setUser(null);
+        toast.error(data.message || 'Error de inicio de sesión.');
+        return false;
       }
     } catch (error) {
-      console.error("Error de red durante el login:", error);
-      return { success: false, message: "Error de conexión. Inténtalo de nuevo." };
+      console.error("Error al iniciar sesión:", error);
+      toast.error('Ocurrió un error al intentar iniciar sesión.');
+      return false;
+    } finally {
+      setLoading(false);
     }
   };
 
   const logout = async () => {
     try {
-        await fetch(`${process.env.REACT_APP_API_URL}/admin/logout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include' // <--- AÑADE ESTA LÍNEA
-        });
-    } catch (error) {
-        console.error("Error al cerrar sesión en el servidor:", error);
-    } finally {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/logout`, {
+        method: 'POST',
+        // CRUCIAL: También se necesita 'credentials: "include"' para
+        // que la solicitud de cierre de sesión envíe la cookie correcta.
+        credentials: 'include' 
+      });
+
+      if (response.ok) {
+        setIsAuthenticated(false);
         setUser(null);
-        navigate('/admin/login', { replace: true });
+        toast.success('Has cerrado sesión correctamente.');
+      } else {
+        toast.error('Error al cerrar sesión.');
+      }
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+      toast.error('Ocurrió un error al cerrar sesión.');
     }
   };
 
-  return (
-    <AuthContext.Provider value={{ user, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
+  const value = {
+    isAuthenticated,
+    user,
+    loading,
+    login,
+    logout,
+  };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-export const PrivateRoute = ({ children }) => {
-  const { user } = useAuth();
-  return user ? children : <Navigate to="/admin/login" replace />;
+  return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>;
 };
