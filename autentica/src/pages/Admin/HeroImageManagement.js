@@ -15,16 +15,12 @@ const HeroImageManagement = () => {
 
   const fetchHeroImages = async () => {
     try {
-      const token = getToken(); // Obtenemos el token
-      if (!token) {
-        toast.error('No hay token de autenticación. Inicie sesión de nuevo.');
-        return;
-      }
+      // No necesitamos el token aquí, ya que el backend de Flask
+      // utiliza sesiones/cookies, no JWTs.
       
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/hero_images`, {
-        headers: {
-          'Authorization': `Bearer ${token}` // Añadimos el encabezado de autorización
-        }
+        // Añadimos 'credentials: "include"' para enviar la cookie de sesión
+        credentials: 'include' 
       });
 
       if (!response.ok) {
@@ -59,22 +55,16 @@ const HeroImageManagement = () => {
       toast.error("Por favor, seleccione un archivo para subir.");
       return;
     }
-
-    const token = getToken(); // Obtenemos el token para el upload
-    if (!token) {
-      toast.error('No hay token de autenticación. Inicie sesión de nuevo.');
-      return;
-    }
-
+    
+    // No necesitamos el token aquí
     const formData = new FormData();
     formData.append("hero_image", newImage);
 
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/hero_images`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}` // Añadimos el encabezado de autorización
-        },
+        // Añadimos 'credentials: "include"'
+        credentials: 'include',
         body: formData,
       });
 
@@ -98,18 +88,12 @@ const HeroImageManagement = () => {
       return;
     }
 
-    const token = getToken(); // Obtenemos el token para el delete
-    if (!token) {
-      toast.error('No hay token de autenticación. Inicie sesión de nuevo.');
-      return;
-    }
-
+    // No necesitamos el token aquí
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/hero_images/${id}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}` // Añadimos el encabezado de autorización
-        }
+        // Añadimos 'credentials: "include"'
+        credentials: 'include'
       });
 
       if (!response.ok) {
