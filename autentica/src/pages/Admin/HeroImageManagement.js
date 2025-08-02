@@ -48,7 +48,7 @@ const HeroImageManagement = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:5000/api/admin/hero_images', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/hero_images`, {
         credentials: 'include' // <--- AÑADE ESTA LÍNEA
       });
       if (!response.ok) {
@@ -97,7 +97,7 @@ const HeroImageManagement = () => {
     setMessage(null);
 
     try {
-      const response = await fetch('http://localhost:5000/api/admin/hero_images', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/hero_images`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -123,7 +123,7 @@ const HeroImageManagement = () => {
 const handleToggleActive = async (imageId, currentStatus) => {
     setMessage(null);
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/hero_images/${imageId}/toggle`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/hero_images/${imageId}/toggle`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -153,7 +153,7 @@ const handleToggleActive = async (imageId, currentStatus) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar esta imagen del carrusel?')) {
       setMessage(null);
       try {
-        const response = await fetch(`http://localhost:5000/api/admin/hero_images/${imageId}`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/hero_images/${imageId}`, {
           method: 'DELETE',
           credentials: 'include' // <--- AÑADE ESTA LÍNEA
         });
@@ -203,7 +203,7 @@ const handleToggleActive = async (imageId, currentStatus) => {
               <TableRow key={image.id}>
                 <TableCell>{image.id}</TableCell>
                 <TableCell>
-                  <img src={`http://localhost:5000${image.image_url}`} alt={image.title} style={{ width: '100px', height: '60px', objectFit: 'cover', borderRadius: '4px' }} />
+                  <img src={`${process.env.REACT_APP_API_URL}${image.image_url}`} alt={image.title} style={{ width: '100px', height: '60px', objectFit: 'cover', borderRadius: '4px' }} />
                 </TableCell>
                 <TableCell>{image.title}</TableCell>
                 <TableCell>{image.subtitle}</TableCell>
