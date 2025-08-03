@@ -1,6 +1,6 @@
 # app.py
 
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify, session, render_template, redirect, url_for, flash
 import sqlite3
 import hashlib
 from functools import wraps
@@ -8,104 +8,94 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from flask_cors import CORS
+from flask_cors import CORS # Importa Flask-CORS
 
 app = Flask(__name__)
-# Habilita CORS y permite el envío de credenciales (cookies/sesiones)
-CORS(app, supports_credentials=True)
-# ¡CAMBIA ESTO POR UNA CLAVE SECRETA SEGURA Y ALEATORIA!
-app.secret_key = 'your_secure_random_secret_key_here'
+CORS(app, supports_credentials=True) # Habilita CORS y permite el envío de credenciales (cookies/sesiones)
+app.secret_key = 'your_secure_random_secret_key_here' # ¡CAMBIA ESTO POR UNA CLAVE SECRETA SEGURA Y ALEATORIA!
 app.config['TEMPLATES_AUTO_RELOAD'] = False
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000
 
 # Función para obtener la conexión a la base de datos
 def get_db():
-    try:
-        conn = sqlite3.connect('store.db')
-        conn.row_factory = sqlite3.Row
-        return conn
-    except sqlite3.Error as e:
-        print(f"ERROR: No se pudo conectar a la base de datos: {e}")
-        raise # Vuelve a lanzar la excepción para que Flask la capture
+    conn = sqlite3.connect('store.db')
+    conn.row_factory = sqlite3.Row # Esto permite acceder a las filas como diccionarios
+    return conn
 
 # Decorador para proteger rutas que requieren inicio de sesión de administrador
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        print(f"DEBUG: Verificando login_required para user_id: {session.get('user_id')}")
         if 'user_id' not in session:
-            print("DEBUG: Solicitud de API no autorizada.")
-            return jsonify({'message': 'No autorizado. Por favor, inicia sesión.'}), 401
+            # Si es una solicitud de API (desde React), devuelve JSON
+            if request.accept_mimetypes.best == 'application/json':
+                return jsonify({'message': 'No autorizado. Por favor, inicia sesión.'}), 401
+            # Si es una solicitud de navegador, redirige a la página de login
+            flash('Por favor, inicia sesión para acceder a esta página.', 'danger')
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
-# Rutas de Autenticación para API (solo JSON)
-@app.route('/admin/login', methods=['POST']) # Solo POST para API login
+# Rutas de Autenticación y Administración
+@app.route('/admin/login', methods=['GET', 'POST'])
 def login():
-    username = request.form.get('username')
-    password = request.form.get('password')
+    if request.method == 'POST':
+        if request.is_json:
+            # Si la solicitud es JSON (desde React), obtenemos los datos
+            data = request.get_json()
+            username = data.get('username')
+            password = data.get('password')
+        else:
+            # Si la solicitud es de un formulario, usamos request.form
+            username = request.form.get('username')
+            password = request.form.get('password')
 
-    print(f"DEBUG: Intento de login para usuario: {username}")
+        if not username or not password:
+            if request.accept_mimetypes.best == 'application/json':
+                return jsonify({'success': False, 'message': 'Usuario y contraseña son requeridos.'}), 400
+            flash('Usuario y contraseña son requeridos.', 'danger')
+            return render_template('admin/login.html')
 
-    if not username or not password:
-        print("DEBUG: Usuario o contraseña faltantes.")
-        return jsonify({'success': False, 'message': 'Usuario y contraseña son requeridos.'}), 400
+        # La contraseña se hashea con SHA256 para comparación
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
 
-    hashed_password = hashlib.sha256(password.encode()).hexdigest()
-    print(f"DEBUG: Contraseña hasheada: {hashed_password}")
-
-    db = None
-    try:
         db = get_db()
-        print("DEBUG: Conexión a DB exitosa.")
         user = db.execute('SELECT * FROM users WHERE username = ? AND password = ?',
                          (username, hashed_password)).fetchone()
-        print(f"DEBUG: Resultado de la consulta de usuario: {user}")
+        db.close()
 
         if user:
             session['user_id'] = user['id']
             session['username'] = user['username']
-            print(f"DEBUG: Login exitoso para {username}. ID de sesión: {session['user_id']}")
-            return jsonify({'success': True, 'message': 'Inicio de sesión exitoso.', 'user': {'username': user['username']}})
+            if request.accept_mimetypes.best == 'application/json':
+                return jsonify({'success': True, 'message': 'Inicio de sesión exitoso.', 'user': {'username': user['username']}})
+            flash('Inicio de sesión exitoso.', 'success')
+            return redirect(url_for('admin_dashboard'))
         else:
-            print(f"DEBUG: Intento de login fallido: credenciales incorrectas para {username}")
-            return jsonify({'success': False, 'message': 'Nombre de usuario o contraseña incorrectos.'}), 401
-    except sqlite3.Error as e:
-        print(f"ERROR: Error de SQLite durante el login: {e}")
-        return jsonify({'success': False, 'message': f'Error de base de datos: {str(e)}'}), 500
-    except Exception as e:
-        print(f"ERROR: Error inesperado durante el login: {e}")
-        return jsonify({'success': False, 'message': f'Error interno del servidor: {str(e)}'}), 500
-    finally:
-        if db:
-            db.close()
-            print("DEBUG: Conexión a DB cerrada.")
+            if request.accept_mimetypes.best == 'application/json':
+                return jsonify({'success': False, 'message': 'Nombre de usuario o contraseña incorrectos.'}), 401
+            flash('Nombre de usuario o contraseña incorrectos.', 'danger')
+    return render_template('admin/login.html') # Asume que tienes un template para el login de admin
 
-@app.route('/admin/logout', methods=['POST'])
+@app.route('/admin/logout', methods=['POST']) # Cambiado a POST para API
 @login_required
 def logout():
-    print(f"DEBUG: Cerrando sesión para user_id: {session.get('user_id')}")
     session.pop('user_id', None)
     session.pop('username', None)
-    return jsonify({'success': True, 'message': 'Has cerrado sesión exitosamente.'})
+    if request.accept_mimetypes.best == 'application/json':
+        return jsonify({'success': True, 'message': 'Has cerrado sesión exitosamente.'})
+    flash('Has cerrado sesión exitosamente.', 'info')
+    return redirect(url_for('login'))
 
-# --- Rutas API para la gestión de productos (Inventario) ---
+# Rutas API para la gestión de productos (Inventario)
 @app.route('/api/admin/products', methods=['GET'])
 @login_required
 def admin_get_products():
-    db = None
-    try:
-        db = get_db()
-        products = db.execute('SELECT * FROM inventory').fetchall()
-        products_list = [dict(row) for row in products]
-        print(f"DEBUG: Devolviendo {len(products_list)} productos para admin.")
-        return jsonify(products_list)
-    except Exception as e:
-        print(f"ERROR: Error en admin_get_products: {e}")
-        return jsonify({'success': False, 'message': f'Error al obtener productos: {str(e)}'}), 500
-    finally:
-        if db:
-            db.close()
+    db = get_db()
+    products = db.execute('SELECT * FROM inventory').fetchall()
+    db.close()
+    products_list = [dict(row) for row in products]
+    return jsonify(products_list)
 
 @app.route('/api/admin/products', methods=['POST'])
 @login_required
@@ -121,9 +111,8 @@ def admin_add_product():
     if not all([name, price, stock, image_url]):
         return jsonify({'success': False, 'message': 'Faltan campos requeridos.'}), 400
 
-    db = None
+    db = get_db()
     try:
-        db = get_db()
         db.execute('INSERT INTO inventory (name, description, category, price, stock, image_url) VALUES (?, ?, ?, ?, ?, ?)',
                    (name, description, category, price, stock, image_url))
         db.commit()
@@ -131,8 +120,7 @@ def admin_add_product():
     except sqlite3.Error as e:
         return jsonify({'success': False, 'message': f'Error al añadir producto: {str(e)}'}), 500
     finally:
-        if db:
-            db.close()
+        db.close()
 
 @app.route('/api/admin/products/<int:product_id>', methods=['PUT'])
 @login_required
@@ -148,9 +136,8 @@ def admin_edit_product(product_id):
     if not all([name, price, stock, image_url]):
         return jsonify({'success': False, 'message': 'Faltan campos requeridos.'}), 400
 
-    db = None
+    db = get_db()
     try:
-        db = get_db()
         db.execute('UPDATE inventory SET name = ?, description = ?, category = ?, price = ?, stock = ?, image_url = ? WHERE id = ?',
                    (name, description, category, price, stock, image_url, product_id))
         db.commit()
@@ -160,15 +147,13 @@ def admin_edit_product(product_id):
     except sqlite3.Error as e:
         return jsonify({'success': False, 'message': f'Error al actualizar producto: {str(e)}'}), 500
     finally:
-        if db:
-            db.close()
+        db.close()
 
 @app.route('/api/admin/products/<int:product_id>', methods=['DELETE'])
 @login_required
 def admin_delete_product(product_id):
-    db = None
+    db = get_db()
     try:
-        db = get_db()
         db.execute('DELETE FROM inventory WHERE id = ?', (product_id,))
         db.commit()
         if db.cursor().rowcount == 0:
@@ -177,29 +162,22 @@ def admin_delete_product(product_id):
     except sqlite3.Error as e:
         return jsonify({'success': False, 'message': f'Error al eliminar producto: {str(e)}'}), 500
     finally:
-        if db:
-            db.close()
+        db.close()
 
-# --- Rutas API para la gestión de imágenes del Hero ---
+# Rutas API para la gestión de imágenes del Hero
 @app.route('/api/admin/hero_images', methods=['GET'])
 @login_required
 def admin_get_hero_images():
-    db = None
-    try:
-        db = get_db()
-        images = db.execute('SELECT * FROM hero_images').fetchall()
-        images_list = [dict(row) for row in images]
-        return jsonify(images_list)
-    except Exception as e:
-        print(f"ERROR: Error en admin_get_hero_images: {e}")
-        return jsonify({'success': False, 'message': f'Error al obtener imágenes del Hero: {str(e)}'}), 500
-    finally:
-        if db:
-            db.close()
+    db = get_db()
+    images = db.execute('SELECT * FROM hero_images').fetchall()
+    db.close()
+    images_list = [dict(row) for row in images]
+    return jsonify(images_list)
 
 @app.route('/api/admin/hero_images', methods=['POST'])
 @login_required
 def admin_add_hero_image():
+    # Asegúrate de que la solicitud sea JSON para el frontend de React
     data = request.get_json()
     image_url = data.get('image_url')
     title = data.get('title', '')
@@ -209,9 +187,8 @@ def admin_add_hero_image():
     if not image_url:
         return jsonify({'success': False, 'message': 'La URL de la imagen es requerida.'}), 400
 
-    db = None
+    db = get_db()
     try:
-        db = get_db()
         db.execute('INSERT INTO hero_images (image_url, title, subtitle, active) VALUES (?, ?, ?, ?)',
                    (image_url, title, subtitle, active))
         db.commit()
@@ -219,15 +196,13 @@ def admin_add_hero_image():
     except sqlite3.Error as e:
         return jsonify({'success': False, 'message': f'Error al añadir imagen del Hero: {str(e)}'}), 500
     finally:
-        if db:
-            db.close()
+        db.close()
 
 @app.route('/api/admin/hero_images/<int:image_id>/toggle', methods=['PUT'])
 @login_required
 def admin_toggle_hero_image(image_id):
-    db = None
+    db = get_db()
     try:
-        db = get_db()
         image = db.execute('SELECT active FROM hero_images WHERE id = ?', (image_id,)).fetchone()
         if not image:
             return jsonify({'success': False, 'message': 'Imagen del Hero no encontrada.'}), 404
@@ -238,15 +213,13 @@ def admin_toggle_hero_image(image_id):
     except sqlite3.Error as e:
         return jsonify({'success': False, 'message': f'Error al cambiar estado de imagen del Hero: {str(e)}'}), 500
     finally:
-        if db:
-            db.close()
+        db.close()
 
 @app.route('/api/admin/hero_images/<int:image_id>', methods=['DELETE'])
 @login_required
 def admin_delete_hero_image(image_id):
-    db = None
+    db = get_db()
     try:
-        db = get_db()
         db.execute('DELETE FROM hero_images WHERE id = ?', (image_id,))
         db.commit()
         if db.cursor().rowcount == 0:
@@ -255,28 +228,20 @@ def admin_delete_hero_image(image_id):
     except sqlite3.Error as e:
         return jsonify({'success': False, 'message': f'Error al eliminar imagen del Hero: {str(e)}'}), 500
     finally:
-        if db:
-            db.close()
+        db.close()
 
-# --- Rutas API para la gestión de Novedades ---
+# Rutas API para la gestión de Novedades
 @app.route('/api/admin/novedades', methods=['GET'])
 @login_required
 def admin_get_novedades():
-    db = None
-    try:
-        db = get_db()
-        novedades_products = db.execute('''
-            SELECT i.* FROM inventory i
-            JOIN novedades n ON i.id = n.product_id
-        ''').fetchall()
-        novedades_list = [dict(row) for row in novedades_products]
-        return jsonify(novedades_list)
-    except Exception as e:
-        print(f"ERROR: Error en admin_get_novedades: {e}")
-        return jsonify({'success': False, 'message': f'Error al obtener novedades: {str(e)}'}), 500
-    finally:
-        if db:
-            db.close()
+    db = get_db()
+    novedades_products = db.execute('''
+        SELECT i.* FROM inventory i
+        JOIN novedades n ON i.id = n.product_id
+    ''').fetchall()
+    db.close()
+    novedades_list = [dict(row) for row in novedades_products]
+    return jsonify(novedades_list)
 
 @app.route('/api/admin/novedades', methods=['POST'])
 @login_required
@@ -287,9 +252,8 @@ def admin_add_novedad():
     if not product_id:
         return jsonify({'success': False, 'message': 'ID de producto es requerido.'}), 400
 
-    db = None
+    db = get_db()
     try:
-        db = get_db()
         db.execute('INSERT INTO novedades (product_id) VALUES (?)', (product_id,))
         db.commit()
         return jsonify({'success': True, 'message': 'Producto añadido a Novedades.'}), 201
@@ -298,15 +262,13 @@ def admin_add_novedad():
     except sqlite3.Error as e:
         return jsonify({'success': False, 'message': f'Error al añadir a Novedades: {str(e)}'}), 500
     finally:
-        if db:
-            db.close()
+        db.close()
 
 @app.route('/api/admin/novedades/<int:product_id>', methods=['DELETE'])
 @login_required
 def admin_remove_novedad(product_id):
-    db = None
+    db = get_db()
     try:
-        db = get_db()
         db.execute('DELETE FROM novedades WHERE product_id = ?', (product_id,))
         db.commit()
         if db.cursor().rowcount == 0:
@@ -315,57 +277,48 @@ def admin_remove_novedad(product_id):
     except sqlite3.Error as e:
         return jsonify({'success': False, 'message': f'Error al eliminar de Novedades: {str(e)}'}), 500
     finally:
-        if db:
-            db.close()
+        db.close()
 
-# --- Rutas API para el Frontend React (públicas, sin login_required) ---
+# Rutas API para el Frontend React (públicas, sin login_required)
 @app.route('/api/products', methods=['GET'])
 def get_products():
-    db = None
-    try:
-        db = get_db()
-        products = db.execute('SELECT * FROM inventory').fetchall()
-        products_list = [dict(row) for row in products]
-        return jsonify(products_list)
-    except Exception as e:
-        print(f"ERROR: Error en get_products (pública): {e}")
-        return jsonify({'success': False, 'message': f'Error al obtener productos: {str(e)}'}), 500
-    finally:
-        if db:
-            db.close()
+    """
+    API para obtener todos los productos del inventario (público).
+    """
+    db = get_db()
+    products = db.execute('SELECT * FROM inventory').fetchall()
+    db.close()
+    products_list = [dict(row) for row in products]
+    return jsonify(products_list)
 
 @app.route('/api/novedades', methods=['GET'])
 def get_novedades():
-    db = None
-    try:
-        db = get_db()
-        novedades = db.execute('SELECT i.* FROM inventory i JOIN novedades n ON i.id = n.product_id').fetchall()
-        novedades_list = [dict(row) for row in novedades]
-        return jsonify(novedades_list)
-    except Exception as e:
-        print(f"ERROR: Error en get_novedades (pública): {e}")
-        return jsonify({'success': False, 'message': f'Error al obtener novedades: {str(e)}'}), 500
-    finally:
-        if db:
-            db.close()
+    """
+    API para obtener productos marcados como novedades (público).
+    """
+    db = get_db()
+    novedades = db.execute('SELECT i.* FROM inventory i JOIN novedades n ON i.id = n.product_id').fetchall()
+    db.close()
+    novedades_list = [dict(row) for row in novedades]
+    return jsonify(novedades_list)
 
 @app.route('/api/hero_images', methods=['GET'])
 def get_hero_images_api():
-    db = None
-    try:
-        db = get_db()
-        images = db.execute('SELECT image_url, title, subtitle FROM hero_images WHERE active = 1').fetchall()
-        images_list = [dict(row) for row in images]
-        return jsonify(images_list)
-    except Exception as e:
-        print(f"ERROR: Error en get_hero_images_api (pública): {e}")
-        return jsonify({'success': False, 'message': f'Error al obtener imágenes del Hero: {str(e)}'}), 500
-    finally:
-        if db:
-            db.close()
+    """
+    API para obtener las imágenes activas del carrusel Hero (público).
+    """
+    db = get_db()
+    images = db.execute('SELECT image_url, title, subtitle FROM hero_images WHERE active = 1').fetchall()
+    db.close()
+    images_list = [dict(row) for row in images]
+    return jsonify(images_list)
 
 @app.route('/api/enviar-mensaje', methods=['POST'])
 def api_enviar_mensaje():
+    """
+    API para enviar mensajes desde el formulario de contacto (público).
+    Espera datos JSON y envía un correo electrónico.
+    """
     if not request.is_json:
         return jsonify({"success": False, "message": "Content-Type must be application/json"}), 400
 
@@ -401,7 +354,7 @@ def api_enviar_mensaje():
         server.quit()
         return jsonify({'success': True, 'message': 'Mensaje enviado, te contactaremos pronto'})
     except Exception as e:
-        print(f"ERROR: Error al enviar correo: {e}")
+        print(f"Error al enviar correo: {e}")
         return jsonify({'success': False, 'message': f'Error al enviar mensaje: {str(e)}'}), 500
 
 # Ruta para servir archivos estáticos (imágenes, CSS, JS)
@@ -415,5 +368,6 @@ def index():
     return "Backend de Autentica funcionando. El frontend React se sirve por separado."
 
 
-#if __name__ == '__main__':
- #   app.run(debug=True, port=5000)
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
+
