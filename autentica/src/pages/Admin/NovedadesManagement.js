@@ -41,7 +41,7 @@ const NovedadesManagement = () => {
     setLoading(true);
     setError(null);
     try {
-      const novedadesResponse = await fetch('http://localhost:5000/api/admin/novedades', {
+      const novedadesResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/novedades`, {
         credentials: 'include' // <--- AÑADE ESTA LÍNEA
       });
       if (!novedadesResponse.ok) {
@@ -50,7 +50,7 @@ const NovedadesManagement = () => {
       const novedadesData = await novedadesResponse.json();
       setNovedades(novedadesData);
 
-      const allProductsResponse = await fetch('http://localhost:5000/api/admin/products', {
+      const allProductsResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/products`, {
         credentials: 'include' // <--- AÑADE ESTA LÍNEA
       });
       if (!allProductsResponse.ok) {
@@ -87,7 +87,7 @@ const NovedadesManagement = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/admin/novedades', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/novedades`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -120,7 +120,7 @@ const NovedadesManagement = () => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este producto de novedades?')) {
       setMessage(null);
       try {
-        const response = await fetch(`http://localhost:5000/api/admin/novedades/${productId}`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/novedades/${productId}`, {
           method: 'DELETE',
           credentials: 'include'
         });
@@ -179,7 +179,7 @@ const NovedadesManagement = () => {
               <TableRow key={product.id}>
                 <TableCell>{product.id}</TableCell>
                 <TableCell>
-                  <img src={`http://localhost:5000${product.image_url}`} alt={product.name} style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
+                  <img src={`${process.env.REACT_APP_API_URL}${product.image_url}`} alt={product.name} style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
                 </TableCell>
                 <TableCell>{product.name}</TableCell>
                 <TableCell>$/. {product.price.toFixed(2)}</TableCell>

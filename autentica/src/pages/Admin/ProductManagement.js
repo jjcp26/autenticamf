@@ -52,7 +52,7 @@ const ProductManagement = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:5000/api/admin/products', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/products`, {
         credentials: 'include' // <--- AÑADE ESTA LÍNEA
       });
       if (!response.ok) {
@@ -127,9 +127,8 @@ const ProductManagement = () => {
 
     const method = currentProduct ? 'PUT' : 'POST';
     const url = currentProduct
-      ? `http://localhost:5000/api/admin/products/${currentProduct.id}`
-      : 'http://localhost:5000/api/admin/products';
-
+      ? `${process.env.REACT_APP_API_URL}/api/admin/products/${currentProduct.id}` : 
+        `${process.env.REACT_APP_API_URL}/api/admin/products`;
     try {
       const response = await fetch(url, {
         method: method,
@@ -169,7 +168,7 @@ const ProductManagement = () => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este producto?')) {
       setMessage(null);
       try {
-        const response = await fetch(`http://localhost:5000/api/admin/products/${productId}`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/products/${productId}`, {
           method: 'DELETE',
           credentials: 'include'
         });
@@ -221,7 +220,7 @@ const ProductManagement = () => {
               <TableRow key={product.id}>
                 <TableCell>{product.id}</TableCell>
                 <TableCell>
-                  <img src={`http://localhost:5000${product.image_url}`} alt={product.name} style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
+                  <img src={`${process.env.REACT_APP_API_URL}${product.image_url}`} alt={product.name} style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
                 </TableCell>
                 <TableCell>{product.name}</TableCell>
                 <TableCell>{product.category}</TableCell>
